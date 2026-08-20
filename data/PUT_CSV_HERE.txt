@@ -1,0 +1,11 @@
+Place your DataCoSupplyChainDataset.csv file in this folder.
+
+Download from:
+https://www.kaggle.com/datasets/saicharankomati/dataco-supply-chain-dataset
+
+File size: ~96 MB
+Rows: 180,519
+Columns: 53
+
+After placing the file here, update the CSV_PATH in:
+python/load_staging.py

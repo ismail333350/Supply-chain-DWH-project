@@ -1,0 +1,331 @@
+@startuml DataCo_Supply_Chain_DWH
+
+skinparam linetype ortho
+skinparam backgroundColor #FFFFFF
+skinparam defaultFontName Arial
+skinparam defaultFontSize 11
+skinparam classAttributeIconSize 0
+skinparam roundcorner 8
+
+skinparam class {
+    BackgroundColor #F8F9FA
+    BorderColor #495057
+    HeaderBackgroundColor #212529
+    HeaderFontColor #FFFFFF
+    FontColor #212529
+    BorderThickness 1.5
+}
+
+skinparam package {
+    BackgroundColor #FFFFFF
+    BorderColor #ADB5BD
+    BorderThickness 1.5
+    FontColor #212529
+    FontSize 13
+    FontStyle bold
+}
+
+skinparam note {
+    BackgroundColor #FFF9C4
+    BorderColor #F9A825
+    FontColor #212529
+    FontSize 10
+}
+
+skinparam arrow {
+    Color #495057
+    Thickness 2
+}
+
+' ─────────────────────────────────────────
+'  SOURCE LAYER
+' ─────────────────────────────────────────
+package "SOURCE" #FFF3E0 {
+    class "DataCoSupplyChainDataset.csv" as CSV <<source file>> {
+        180,519 rows · 53 columns
+        ..
+        Type
+        Days_for_shipping_real
+        Days_for_shipment_scheduled
+        Delivery_Status
+        Late_delivery_risk
+        Shipping_Mode
+        Order_Date
+        Shipping_Date
+        Order_Status
+        Customer_Id
+        Customer_Fname / Lname
+        Customer_Segment
+        Customer_City / State / Country
+        Customer_Zipcode
+        Order_Id
+        Order_Item_Id
+        Order_Item_Quantity
+        Order_Item_Product_Price
+        Order_Item_Discount
+        Order_Item_Discount_Rate
+        Order_Item_Total
+        Order_Profit_Per_Order
+        Order_Item_Profit_Ratio
+        Sales / Benefit_Per_Order
+        Sales_Per_Customer
+        Product_Card_Id
+        Product_Name
+        Category_Name
+        Department_Name
+        Product_Price
+        Product_Status
+        Market
+        Order_Region / City / Country
+        Latitude / Longitude
+        --dropped--
+        Product_Description <<100% NULL>>
+        Product_Image <<URL only>>
+    }
+}
+
+' ─────────────────────────────────────────
+'  STAGING LAYER
+' ─────────────────────────────────────────
+package "STAGING LAYER  |  staging schema" #FFF8E1 {
+    class "stg_orders" as STG <<staging table>> {
+        180,518 rows · 51 columns
+        ..
+        All source columns retained
+        Column names normalized
+        Dates parsed to TIMESTAMP
+        Duplicates removed on order_item_id
+        product_description dropped
+        product_image dropped
+    }
+}
+
+' ─────────────────────────────────────────
+'  WAREHOUSE LAYER
+' ─────────────────────────────────────────
+package "WAREHOUSE LAYER  |  warehouse schema  |  Star Schema" #E8F5E9 {
+
+    class "fact_orders" as FACT <<fact table  |  grain: order line item>> {
+        __Primary Key__
+        # order_item_id : INT
+        __Foreign Keys__
+        ~ customer_sk  : INT → dim_customer
+        ~ product_sk   : INT → dim_product
+        ~ date_id      : INT → dim_date
+        ~ geography_id : INT → dim_geography
+        ~ shipping_id  : INT → dim_shipping
+        ~ order_id     : INT
+        __Measures__
+        + quantity           : INT
+        + unit_price         : NUMERIC
+        + discount_amount    : NUMERIC
+        + discount_rate      : NUMERIC
+        + line_total         : NUMERIC
+        + sales              : NUMERIC
+        + benefit            : NUMERIC
+        + profit             : NUMERIC
+        + profit_ratio       : NUMERIC
+        + late_delivery_risk : INT
+        + order_status       : VARCHAR
+        + payment_type       : VARCHAR
+    }
+
+    class "dim_customer" as DCUST <<dimension  |  SCD Type 1>> {
+        __Surrogate Key__
+        # customer_sk   : SERIAL
+        __Natural Key__
+        + customer_id   : INT UNIQUE
+        __Attributes__
+        + customer_name : VARCHAR
+        + segment       : VARCHAR
+        + city          : VARCHAR
+        + state         : VARCHAR
+        + country       : VARCHAR
+        + zipcode       : VARCHAR
+    }
+
+    class "dim_product" as DPROD <<dimension  |  SCD Type 1>> {
+        __Surrogate Key__
+        # product_sk      : SERIAL
+        __Natural Key__
+        + product_id      : INT UNIQUE
+        __Attributes__
+        + product_name    : VARCHAR
+        + category_name   : VARCHAR
+        + department_name : VARCHAR
+        + product_price   : NUMERIC
+    }
+
+    class "dim_date" as DDATE <<dimension  |  Static>> {
+        __Key__
+        # date_id      : INT <<YYYYMMDD>>
+        __Attributes__
+        + full_date    : DATE
+        + year         : INT
+        + month        : INT
+        + month_name   : VARCHAR
+        + quarter      : INT
+        + day_of_week  : INT
+        + day_name     : VARCHAR
+    }
+
+    class "dim_geography" as DGEO <<dimension  |  SCD Type 1>> {
+        __Surrogate Key__
+        # geography_id  : INT
+        __Attributes__
+        + order_city    : VARCHAR
+        + order_state   : VARCHAR
+        + order_country : VARCHAR
+        + order_region  : VARCHAR
+        + market        : VARCHAR
+        + latitude      : NUMERIC
+        + longitude     : NUMERIC
+    }
+
+    class "dim_shipping" as DSHIP <<dimension  |  SCD Type 1>> {
+        __Surrogate Key__
+        # shipping_id               : INT
+        __Attributes__
+        + shipping_mode              : VARCHAR
+        + delivery_status            : VARCHAR
+        + days_for_shipment_scheduled: INT
+        + days_for_shipping_real     : INT
+        + delay_days                 : INT <<computed>>
+    }
+
+    FACT }o--|| DCUST : customer_sk
+    FACT }o--|| DPROD : product_sk
+    FACT }o--|| DDATE : date_id
+    FACT }o--|| DGEO  : geography_id
+    FACT }o--|| DSHIP : shipping_id
+}
+
+' ─────────────────────────────────────────
+'  MARTS LAYER
+' ─────────────────────────────────────────
+package "MARTS LAYER  |  marts schema  |  Materialized Views" #E3F2FD {
+
+    class "mart_delivery_performance" as M1 <<materialized view>> {
+        Business question:
+        Which markets and shipping modes
+        have the highest late delivery rates?
+        ..
+        + market
+        + order_region
+        + shipping_mode
+        + total_orders
+        + late_orders
+        + late_rate_pct
+        + avg_delay_days
+    }
+
+    class "mart_product_profitability" as M2 <<materialized view>> {
+        Business question:
+        Which categories drive
+        the most profit and margin?
+        ..
+        + category_name
+        + department_name
+        + total_orders
+        + total_profit
+        + avg_profit_per_order
+        + total_revenue
+        + avg_margin_pct
+    }
+
+    class "mart_monthly_revenue" as M3 <<materialized view>> {
+        Business question:
+        What is the month-over-month
+        revenue trend per market?
+        ..
+        + year
+        + month
+        + month_name
+        + market
+        + total_orders
+        + total_revenue
+        + total_profit
+        + avg_margin_pct
+    }
+}
+
+' ─────────────────────────────────────────
+'  PRESENTATION LAYER
+' ─────────────────────────────────────────
+package "PRESENTATION LAYER" #FCE4EC {
+    class "Power BI" as PBI <<dashboard>> {
+        Connects directly to marts schema
+        ..
+        Delivery Performance Report
+        Product Profitability Report
+        Monthly Revenue Trend Report
+    }
+}
+
+' ─────────────────────────────────────────
+'  FLOW ARROWS
+' ─────────────────────────────────────────
+CSV -down[#E65100,thickness=3]-> STG : "Python  |  pandas + sqlalchemy\n• Normalize column names\n• Parse dates\n• Drop useless columns\n• Deduplicate on order_item_id\n• Full replace every run"
+
+STG -down[#2E7D32,thickness=3]-> FACT : "SQL  |  pgAdmin\n• GROUP BY join key only for geo\n• ROW_NUMBER() for customer & product\n• ON CONFLICT DO NOTHING\n• Indexes on all FK columns"
+
+STG -down[#2E7D32,thickness=2]-> DCUST
+STG -down[#2E7D32,thickness=2]-> DPROD
+STG -down[#2E7D32,thickness=2]-> DDATE
+STG -down[#2E7D32,thickness=2]-> DGEO
+STG -down[#2E7D32,thickness=2]-> DSHIP
+
+FACT -down[#1565C0,thickness=2]-> M1
+FACT -down[#1565C0,thickness=2]-> M2
+FACT -down[#1565C0,thickness=2]-> M3
+
+M1 -down[#880E4F,thickness=2]-> PBI
+M2 -down[#880E4F,thickness=2]-> PBI
+M3 -down[#880E4F,thickness=2]-> PBI
+
+' ─────────────────────────────────────────
+'  NOTES
+' ─────────────────────────────────────────
+note right of CSV
+  Known issues handled:
+  ✗ product_description — 100% NULL → dropped
+  ✗ product_image — URLs only → dropped
+  ✗ order_item_id — 1 duplicate → removed
+  ✗ latitude/longitude — float variation
+    caused fan trap in dim_geography → fixed
+    by GROUP BY join key columns only
+end note
+
+note right of DCUST
+  No SCD2 in this version.
+  One row per customer using
+  ROW_NUMBER() OVER
+  (PARTITION BY customer_id
+   ORDER BY order_date DESC)
+  Most recent record wins.
+end note
+
+note right of DGEO
+  Join key: order_city +
+  order_country + order_region ONLY.
+  MIN(order_state), MIN(market),
+  AVG(lat/lon) to avoid fan trap.
+  Critical fix discovered during
+  diagnosis — float precision caused
+  689x row multiplication.
+end note
+
+note bottom of FACT
+  Grain: one row per order line item (order_item_id)
+  ~180,518 rows · 20 columns
+  INNER JOIN on customer + product (must match)
+  LEFT JOIN on geography + shipping (nullable)
+  ON CONFLICT (order_item_id) DO NOTHING as safety net
+end note
+
+note right of M1
+  REFRESH MATERIALIZED VIEW
+  after every pipeline run
+end note
+
+@enduml

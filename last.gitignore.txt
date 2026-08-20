@@ -1,0 +1,15 @@
+# Dataset — too large for GitHub
+data/*.csv
+data/*.xlsx
+
+# Python virtual environment
+venv/
+__pycache__/
+*.pyc
+*.pyo
+.env
+
+# pgAdmin and OS files
+*.pgpass
+.DS_Store
+Thumbs.db

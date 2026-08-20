@@ -1,5 +1,3 @@
-Place your DataCoSupplyChainDataset.csv file in this folder.
-
 Download from:
 https://www.kaggle.com/datasets/saicharankomati/dataco-supply-chain-dataset
 

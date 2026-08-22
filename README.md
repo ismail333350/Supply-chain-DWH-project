@@ -1,6 +1,6 @@
 # DataCo Supply Chain — Data Warehouse
 
-A production-pattern Data Warehouse built on **PostgreSQL** using the DataCo Supply Chain dataset (180,518 order records). The project implements a full three-layer architecture — staging, warehouse, and analytical marts — connected to **Power BI** for business reporting.
+An end-to-end dimensional Data Warehouse built on **PostgreSQL** using the DataCo Supply Chain dataset (180,518 order records). The project implements a full three-layer architecture — staging, warehouse, and analytical marts — connected to **Power BI** for business reporting.
 
 ---
 

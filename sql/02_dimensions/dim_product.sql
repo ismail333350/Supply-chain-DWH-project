@@ -5,7 +5,7 @@
 --  Source  : staging.stg_orders
 --
 --  DESIGN DECISION:
---  Uses ROW_NUMBER() OVER (PARTITION BY product_card_id ORDER BY
+--  I Used ROW_NUMBER() OVER (PARTITION BY product_card_id ORDER BY
 --  order_date_dateorders DESC) to guarantee exactly one row per
 --  product regardless of price or category variations across orders.
 --  Most recent record wins — reflects current product attributes.

@@ -5,7 +5,7 @@
 --  Source  : staging.stg_orders
 --
 --  DESIGN DECISION:
---  Uses ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY
+--  I Used ROW_NUMBER() OVER (PARTITION BY customer_id ORDER BY
 --  order_date_dateorders DESC) instead of DISTINCT to guarantee
 --  exactly one row per customer_id.
 --

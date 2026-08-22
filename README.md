@@ -40,6 +40,8 @@ This project transforms that flat file into a purpose-built Data Warehouse that 
 | Markets | LATAM, Europe, Pacific Asia, USCA, Africa |
 | Business domains | Orders, Customers, Products, Shipping, Geography |
 
+
+
 ### Known Data Quality Issues
 
 | Issue | Discovery Method | Resolution |
@@ -47,9 +49,9 @@ This project transforms that flat file into a purpose-built Data Warehouse that 
 | `product_description` 100% NULL | EDA at ingestion | Dropped at staging load |
 | `product_image` contains only URLs | EDA at ingestion | Dropped at staging load |
 | 1 duplicate `order_item_id` | Deduplication check in Python | Removed before staging load |
-| Latitude/longitude float variation caused 689x fan trap in dim_geography | Diagnosis query on fact joins | GROUP BY join key columns only, AVG coordinates |
+| Latitude/longitude float variation caused 689x fan trap in `dim_geography` | Diagnosis query on fact joins | GROUP BY join key columns only, AVG coordinates |
 | `order_customer_id` is a redundant copy of `customer_id` | Data dictionary analysis | Used `customer_id` only |
-
+| Multiple `order_state` values found for the same `order_city + order_country + order_region` combination | Data quality validation using `COUNT(DISTINCT order_state)` | Included `order_state` in the `dim_geography` grain and fact-table lookup key |
 ---
 
 ## Architecture

@@ -64,3 +64,47 @@ SELECT
 FROM marts.mart_delivery_performance
 GROUP BY shipping_mode
 ORDER BY late_rate_pct DESC;
+
+
+--  QUERY PERFORMANCE COMPARISON
+--  Before Dimensional Modeling vs After Dimensional Modeling
+--  DataCo Supply Chain DWH — PostgreSQL
+
+-- Version A execution plan
+-- Look for: Seq Scan on stg_orders — reads all 180,518 rows
+EXPLAIN (ANALYZE, FORMAT TEXT)
+WITH market_segment AS (
+    SELECT
+        market,
+        EXTRACT(YEAR FROM order_date_dateorders::date)::int AS year,
+        customer_segment,
+        ROUND(SUM(sales::numeric), 2)                       AS revenue,
+        ROUND(AVG(late_delivery_risk::numeric)*100, 1)      AS late_rate_pct
+    FROM staging.stg_orders
+    WHERE order_date_dateorders IS NOT NULL
+    GROUP BY market,
+             EXTRACT(YEAR FROM order_date_dateorders::date),
+             customer_segment
+)
+SELECT * FROM market_segment ORDER BY year, market, revenue DESC;
+
+
+
+-- Version B execution plan
+-- Look for: Index Scan — jumps directly to matching rows
+EXPLAIN (ANALYZE, FORMAT TEXT)
+WITH market_segment AS (
+    SELECT
+        g.market,
+        d.year,
+        c.segment                                      AS customer_segment,
+        ROUND(SUM(f.sales), 2)                         AS revenue,
+        ROUND(AVG(f.late_delivery_risk::numeric)*100,1) AS late_rate_pct
+    FROM warehouse.fact_orders f
+    JOIN warehouse.dim_date      d ON f.date_id      = d.date_id
+    JOIN warehouse.dim_geography g ON f.geography_id = g.geography_id
+    JOIN warehouse.dim_customer  c ON f.customer_sk  = c.customer_sk
+    GROUP BY g.market, d.year, c.segment
+)
+SELECT * FROM market_segment ORDER BY year, market, revenue DESC;
+
